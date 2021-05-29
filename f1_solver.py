@@ -131,24 +131,20 @@ def print_log(message, verbose):
         print(message)
 
 def print_result(dists, stati, verbose=False):
-    """ Prints distances and stati, as well as all possible winners. """
-    if verbose: # more detailed statistics
-        print(f"(d,s): {[(d, LpStatus[s]) for d,s in zip(dists, stati)]}")
-        print(f"min d={np.min(dists)} with c={np.argmin(dists)+1}")
-        print(f"second to min d={np.partition(dists, 1)[1]}")
-
-    # print results for optimal values
+    """ Prints distances for all possible winners, i.e., optimal solutions.
+    'verbose' activates output for candidates with infeasible solutions. """
     for c, (d,s) in enumerate(zip(dists, stati), start=1):
         if s==LpStatusOptimal:
             print(f"Candidate {c:2d} wins with distance {d:2d}.")
+        else:
+            print_log(f"Candidate {c:2d} cannot win.", verbose)
 
-def check_shapes(cs, vs, nums, verbose=False):
-    """ Checks shapes for candidates 'cs', voters 'vs' and metadata 'nums'. """
+def check_shapes(C, V, nums, verbose=False):
+    """ Checks shapes for candidates 'C', voters 'V' and metadata 'nums'. """
     assert len(nums)==2, "Metadata is corrupt."
-    assert cs.shape==(nums[0], 2), f"cs has invalid shape {cs.shape}."
-    assert len(vs)==nums[1], f"vs has invalid length {len(vs)}."
+    assert C.shape==(nums[0],), f"C has invalid shape {C.shape}."
+    assert len(V)==nums[1], f"V has invalid length {len(V)}."
     print_log(f"Data has correct shapes.", verbose)
-    return True
 
 def read_dataset(rel_path, verbose=False):
     """ Reads data from soi-file referred to by rel_path.
@@ -169,9 +165,9 @@ def read_dataset(rel_path, verbose=False):
             else:
                 (candidates if len(line)==2 else voters).append(line)
 
-    candidates = np.array(candidates)
+    candidates = np.array(candidates)[:,0].astype(int) # drop drivers' names
     for v in voters: # append ties to voters
-        tie = np.setdiff1d(candidates[:,0], v[1:]).tolist()
+        tie = np.setdiff1d(candidates, v[1:]).tolist()
         ties.append([int(e) for e in tie]) # save all ties as int
     voters = [np.array(a[1:], dtype=int) for a in voters] # remove "1-index"
 
@@ -207,9 +203,8 @@ def main(args):
     parsed_args = parse_arguments(args)
     print_log(f"Called with {parsed_args}", parsed_args.verbose)
 
-    cs, vs, nums, ties = read_dataset(parsed_args.dataset, parsed_args.verbose)
-    assert check_shapes(cs, vs, nums, parsed_args.verbose), "Invalid shapes."
-    C = cs[:,0].astype(int)
+    C, V, nums, ties = read_dataset(parsed_args.dataset, parsed_args.verbose)
+    check_shapes(C, V, nums, parsed_args.verbose)
     m = nums[0]
 
     alpha = generate_alpha([10,8,6,5,4,3,2,1], m) # original alpha 2003–2008
@@ -218,7 +213,7 @@ def main(args):
     solver = getSolver(parsed_args.solver, msg=False) # get silent solver
     distances, stati = np.zeros_like(C), np.zeros_like(C)
     for p in C:
-        prob, alpha_p_vars = generate_lp(C, vs, nums, p, alpha, 1)
+        prob, alpha_p_vars = generate_lp(C, V, nums, p, alpha, 1)
         if parsed_args.restr1:
             prob = add_restriction_1(prob, C, nums, alpha_p_vars, ties)
         if parsed_args.restr2:

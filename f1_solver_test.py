@@ -7,27 +7,27 @@ from pulp import getSolver
 
 class TestF1Solver(unittest.TestCase):
     def test_check_shapes_correct(self):
-        cs, ps = np.zeros((3,2)), np.ones((5,3))
+        C, V = np.zeros((3)), np.ones((5,3))
         nums = np.array([3, 5])
-        self.assertTrue(f1_solver.check_shapes(cs, ps, nums, False))
+        f1_solver.check_shapes(C, V, nums, False) # no AssertionError expected
 
-    def test_check_shapes_incorrect_cs(self):
-        cs, ps = np.zeros((2,2)), np.ones((5,3))
+    def test_check_shapes_incorrect_C(self):
+        C, V = np.zeros((2,2)), np.ones((5,3))
         nums = np.array([3, 5])
         with self.assertRaises(AssertionError):
-            f1_solver.check_shapes(cs, ps, nums, False)
+            f1_solver.check_shapes(C, V, nums, False)
 
-    def test_check_shapes_incorrect_ps(self):
-        cs, ps = np.zeros((3,2)), np.ones((4,3))
+    def test_check_shapes_incorrect_V(self):
+        C, V = np.zeros((3)), np.ones((4,3))
         nums = np.array([3, 5])
         with self.assertRaises(AssertionError):
-            f1_solver.check_shapes(cs, ps, nums, False)
+            f1_solver.check_shapes(C, V, nums, False)
 
     def test_check_shapes_incorrect_nums(self):
-        cs, ps = np.zeros((3,2)), np.ones((5,3))
+        C, V = np.zeros((3)), np.ones((5,3))
         nums = np.ones(3)
         with self.assertRaises(AssertionError):
-            f1_solver.check_shapes(cs, ps, nums, False)
+            f1_solver.check_shapes(C, V, nums, False)
 
     def test_generate_alpha(self):
         scores = [2,1]

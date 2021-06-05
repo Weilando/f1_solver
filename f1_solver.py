@@ -1,25 +1,26 @@
 """
-Example call: python -m f1_solver './Data/ED-00010-00000048.soi' -v
+Builds and solves ILPs for alternative scoring system using PuLP.
 
 In general, there are N profiles V_1,...,V_N, each with n voters v_1,...,v_n.
-Each voter v is a linear order over the set of candidates C.
-Here, one season is a profile and voters are rankings/races.
-Each season has only one profile, thus the first dimension N can be omitted.
-(N,n,m) -> (n,m)
+Each voter v is a linear order over the set of candidates C. Here, a season is
+represented by exactly one profile and voters are rankings/races. (N,n,m)->(n,m)
+
+Example call: python -m f1_solver './Data/ED-00010-00000048.soi' -v
 """
 
 import csv
 import numpy as np
 import sys
 from argparse import ArgumentParser
-from pulp import getSolver, listSolvers, LpInteger, LpMinimize, LpProblem, LpStatus, LpStatusOptimal, lpSum, LpVariable, value
+from pulp import getSolver, listSolvers, LpInteger, LpMinimize, LpProblem, \
+                 LpStatus, LpStatusOptimal, lpSum, LpVariable, value
 
 
-# Linear Problem
+# Integer Linear Problem
 
-def generate_lp(C, V, nums, p, alpha, eps=1):
-    """ Generates the LP from the proof of Theorem 1 which minimizes the
-    Manhattan-distance (L1) to the scoring system given by 'alpha'.
+def generate_ilp(C, V, nums, p, alpha, eps=1):
+    """ Generates the ILP from the proof of Theorem 1 which minimizes the
+    Manhattan-distance (L1) to the original scoring system given by 'alpha'.
     Returns an LpProblem-object and alpha' as LpVariables for extensions. """
     m, n = nums[0], nums[1]
     assert eps>0, "eps needs to be positive."
@@ -27,10 +28,8 @@ def generate_lp(C, V, nums, p, alpha, eps=1):
     assert len(V)==n
     assert isinstance(alpha, np.ndarray) and alpha.shape==(m,)
 
-    C_wo_p = np.setdiff1d(C, [p])
-
-    # LP problem and referenced variables
-    prob = LpProblem("Scoring_System_Existence", LpMinimize)
+    # integer linear problem and referenced variables
+    prob = LpProblem("Alternative_Scoring_System_Distance", LpMinimize)
     alpha_p_vars = LpVariable.dicts("alpha_p", C, lowBound=0, cat=LpInteger)
     beta_vars = LpVariable.dicts("beta", C, lowBound=0, cat=LpInteger)
 
@@ -42,6 +41,7 @@ def generate_lp(C, V, nums, p, alpha, eps=1):
         prob += alpha_p_vars[k] + beta_vars[k] >= alpha[k-1], f"Right_abs{k}"
 
     # constraint (1)
+    C_wo_p = np.setdiff1d(C, [p])
     for q in C_wo_p:
         prob += lpSum([((T(V,p,k) - T(V,q,k)) * alpha_p_vars[k]) for k in C]) >= eps, f"Constraint1_{q}"
     # constraint (2)
@@ -56,10 +56,10 @@ def add_restriction_1(prob, C, nums, alpha_p_vars, ties):
     """ Adds restriction (I) to LpProblem 'prob'.
     All positions which tie with the last at least once need to be zero. """
     m = nums[0]
-    assert C.shape==(m,)
+    assert C.shape==(m,) and len(alpha_p_vars)==m
 
     num_tied = get_max_num_of_ties(ties)
-    for t in C[m-num_tied:m-1]:
+    for t in C[m-num_tied : m-1]:
         prob += alpha_p_vars[t] == 0, f"Restriction1_{t}"
 
     return prob
@@ -68,10 +68,10 @@ def add_restriction_2(prob, C, nums, alpha_p_vars, alpha):
     """ Adds restriction (II) to LpProblem 'prob'.
     All positions which are zero in the old system 'alpha' need to be zero. """
     m = nums[0]
-    assert C.shape==(m,)
+    assert C.shape==(m,) and len(alpha_p_vars)==m
 
     num_zero = (alpha == 0).sum()
-    for z in C[m-num_zero:m-1]:
+    for z in C[m-num_zero : m-1]:
         prob += alpha_p_vars[z] == 0, f"Restriction2_{z}"
 
     return prob
@@ -80,19 +80,24 @@ def add_restriction_3(prob, C, nums, alpha_p_vars):
     """ Adds restriction (III) to LpProblem 'prob'.
     Point differences between top positions must be non-decreasing. """
     m = nums[0]
-    assert C.shape==(m,)
+    assert C.shape==(m,) and len(alpha_p_vars)==m
 
     for j in C[:m-2]:
         prob += alpha_p_vars[j] - 2*alpha_p_vars[j+1] + alpha_p_vars[j+2] >= 0, f"Restriction3_{j}"
 
     return prob
 
+
+# ILP Helpers
+
 def generate_alpha(scores, length):
     """ Generates a scoring vector with given length from a list of scores. """
-    assert isinstance(scores, list), "scores has invalid type."
-    if len(scores) > length:
+    assert isinstance(scores, list)
+    len_scores = len(scores)
+
+    if len_scores > length:
         return np.array(scores)[:length]
-    return np.pad(scores, (0, length-len(scores)), 'constant', constant_values=0)
+    return np.pad(scores, (0, length-len_scores), 'constant', constant_values=0)
 
 def get_max_num_of_ties(tied_positions_per_race):
     """ Calculates the maximum number of tied positions in a list of lists. """
@@ -121,7 +126,7 @@ def T(V, c, k):
 # Helpers
 
 def evaluate_lp(prob, solver):
-    """ Solves LpProblem 'prob' and returns if an optimal solution exists. """
+    """ Solves LpProblem 'prob' and returns its solution and status. """
     prob.solve(solver)
     return value(prob.objective), prob.status
 
@@ -147,14 +152,15 @@ def check_shapes(C, V, nums, verbose=False):
     print_log(f"Data has correct shapes.", verbose)
 
 def read_dataset(rel_path, verbose=False):
-    """ Reads data from soi-file referred to by rel_path.
-    Returns candidates and nums=[num_candidates, num_voters] as np.array, voters as list of np.array and ties as list of lists. """
+    """ Reads data from SOI-file referred to by rel_path. Returns 'candidates'
+    and 'nums'=[num_candidates, num_voters] as np.array, 'voters' as list of
+    np.arrays and 'ties' as list of lists. """
     candidates, voters, ties = [], [], []
     nums = np.zeros(2, dtype=int)
 
     csv.register_dialect('skip_space', skipinitialspace=True)
     with open(rel_path, 'r') as f:
-        reader = csv.reader(f , delimiter=',', dialect='skip_space')
+        reader = csv.reader(f, delimiter=',', dialect='skip_space')
 
         for line in reader:
             if len(line)==1:
@@ -169,9 +175,9 @@ def read_dataset(rel_path, verbose=False):
     for v in voters: # append ties to voters
         tie = np.setdiff1d(candidates, v[1:]).tolist()
         ties.append([int(e) for e in tie]) # save all ties as int
-    voters = [np.array(a[1:], dtype=int) for a in voters] # remove "1-index"
+    voters = [np.array(a[1:], dtype=int) for a in voters] # remove "1 index"
 
-    print_log(f"Dataset read successfully. {nums[0]} candidates, {nums[1]} voters.", verbose)
+    print_log(f"Dataset read. {nums[0]} candidates, {nums[1]} voters.", verbose)
     return candidates, voters, nums, ties
 
 
@@ -179,7 +185,7 @@ def read_dataset(rel_path, verbose=False):
 
 def parse_arguments(args):
     """ Creates an ArgumentParser with help messages. """
-    info = "Framework for scoring system evaluations using PULP."
+    info = "Builds and solves ILPs for alternative scoring system using PuLP."
     parser = ArgumentParser(description=info)
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help="activate output")
@@ -192,7 +198,7 @@ def parse_arguments(args):
     parser.add_argument('-s', '--solver', default='COIN_CMD',
                         choices=listSolvers(onlyAvailable=True),
                         help="choose solver")
-    parser.add_argument('dataset', help="specify relative path to toc-file")
+    parser.add_argument('dataset', help="specify relative path to SOI-file")
 
     if len(args) < 1:  # show help, if no arguments are given
         parser.print_help(sys.stderr)
@@ -201,7 +207,7 @@ def parse_arguments(args):
 
 def main(args):
     parsed_args = parse_arguments(args)
-    print_log(f"Called with {parsed_args}", parsed_args.verbose)
+    print_log(f"Called with {parsed_args}.", parsed_args.verbose)
 
     C, V, nums, ties = read_dataset(parsed_args.dataset, parsed_args.verbose)
     check_shapes(C, V, nums, parsed_args.verbose)
@@ -213,7 +219,7 @@ def main(args):
     solver = getSolver(parsed_args.solver, msg=False) # get silent solver
     distances, stati = np.zeros_like(C), np.zeros_like(C)
     for p in C:
-        prob, alpha_p_vars = generate_lp(C, V, nums, p, alpha, 1)
+        prob, alpha_p_vars = generate_ilp(C, V, nums, p, alpha, 1)
         if parsed_args.restr1:
             prob = add_restriction_1(prob, C, nums, alpha_p_vars, ties)
         if parsed_args.restr2:

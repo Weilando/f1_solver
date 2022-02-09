@@ -1,6 +1,6 @@
 # F1 Solver
 
-The python script `f1_solver.py` provides functionality to repoduce the experimental results from the paper “How Hard Is the Manipulative Design of Scoring Systems?” [[BH19]](#BH19).
+The python script `f1_solver.py` provides functionality to reproduce the experimental results from the paper “How Hard Is the Manipulative Design of Scoring Systems?” [[BH19]](#BH19).
 They examine real-world race results from the Formula 1 from 1961 to 2008 and try to find out, if other drivers would have won the season with a different scoring system.
 Therefore, they use the "PrefLib ED-00010: F1 and Skiing" [[Bre09]](#Bre09) dataset.
 
@@ -9,6 +9,7 @@ Therefore, they use the "PrefLib ED-00010: F1 and Skiing" [[Bre09]](#Bre09) data
 `f1_solver.py` offers a command line interface and works with SOI-files from [[Bre09]](#Bre09).
 Results are printed to the command line, but can be saved into a file using pipes.
 The implementation builds the ILP from Section 5 of [[BH19]](#BH19) and uses [PuLP](http://coin-or.github.io/pulp/), a linear programming toolkit for Python, to solve it.
+You can use `f1_solver_env.yml` to [create a conda environment](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) with all necessary python packages.
 
 The following example calls `f1_solver.py` with data from 2008, adds restriction (I.) from the paper, activates more verbose output and redirects the printed results into `result.txt`.
 

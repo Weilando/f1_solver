@@ -1,0 +1,9 @@
+name: f1_solver
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.9.7
+  - numpy=1.21.2
+  - pulp=2.4

@@ -152,7 +152,7 @@ def check_shapes(C, V, nums, verbose=False):
     print_log(f"Data has correct shapes.", verbose)
 
 def read_dataset(rel_path, verbose=False):
-    """ Reads data from SOI-file referred to by rel_path. Returns 'candidates'
+    """ Reads data from SOI-file referred to by 'rel_path'. Returns 'candidates'
     and 'nums'=[num_candidates, num_voters] as np.array, 'voters' as list of
     np.arrays and 'ties' as list of lists. """
     candidates, voters, ties = [], [], []
@@ -185,7 +185,7 @@ def read_dataset(rel_path, verbose=False):
 
 def parse_arguments(args):
     """ Creates an ArgumentParser with help messages. """
-    info = "Builds and solves ILPs for alternative scoring system using PuLP."
+    info = "Builds and solves ILPs for alternative scoring systems using PuLP."
     parser = ArgumentParser(description=info)
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help="activate output")

@@ -4,6 +4,6 @@ channels:
   - conda-forge
 
 dependencies:
-  - python=3.9.7
-  - numpy=1.21.2
+  - python=3.9.13
+  - numpy=1.23.1
   - pulp=2.4
